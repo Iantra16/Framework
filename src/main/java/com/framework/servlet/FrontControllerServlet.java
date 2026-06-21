@@ -2,7 +2,9 @@ package com.framework.servlet;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-
+import java.util.ArrayList;
+import java.util.List;
+import com.framework.util.Util;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,7 +12,18 @@ import jakarta.servlet.http.HttpServletResponse;
 
 public class FrontControllerServlet extends HttpServlet {
 
-    private static final long serialVersionUID = 1L;
+    private List<String> listControllers = new ArrayList<>();
+
+     @Override
+    public void init() throws ServletException {
+        // Lit le package depuis web.xml
+        String packageName = getServletConfig().getInitParameter("package");
+        try {
+            listControllers = Util.getControllers(packageName);
+        } catch (Exception e) {
+            throw new ServletException("Erreur scan controllers : " + e.getMessage(), e);
+        }
+    }
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -33,6 +46,9 @@ public class FrontControllerServlet extends HttpServlet {
         PrintWriter out = response.getWriter();
         out.println("<html><body>");
         out.println("<p>" + url + "</p>");
+        for (String ctrl : listControllers) {
+            out.println("<li>" + ctrl + "</li>");
+        }
         out.println("</body></html>");
     }
 
