@@ -15,8 +15,7 @@ public class Util {
 
         for (File file : dir.listFiles()) {
             if (file.getName().endsWith(".class")) {
-                String className = packageName + "." 
-                    + file.getName().replace(".class", "");
+                String className = packageName + "." + file.getName().replace(".class", "");
                 classes.add(Class.forName(className));
             }
         }
