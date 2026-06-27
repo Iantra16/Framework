@@ -1,59 +1,62 @@
 package com.framework.servlet;
 
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.List;
+import com.framework.util.Mapping;
 import com.framework.util.Util;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServlet;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.*;
+import jakarta.servlet.http.*;
+import java.io.*;
+import java.util.HashMap;
 
 public class FrontControllerServlet extends HttpServlet {
 
-    private List<String> listControllers = new ArrayList<>();
+    private static final long serialVersionUID = 1L;
+    private HashMap<String, Mapping> urlMappings = new HashMap<>();
 
-     @Override
+    @Override
     public void init() throws ServletException {
-        // Lit le package depuis web.xml
         String packageName = getServletConfig().getInitParameter("package");
         try {
-            listControllers = Util.getControllers(packageName);
+            urlMappings = Util.getMappings(packageName);
         } catch (Exception e) {
             throw new ServletException("Erreur scan controllers : " + e.getMessage(), e);
         }
     }
 
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    protected void doGet(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        processRequest(request, response);
+        processRequest(req, res);
     }
 
     @Override
-    protected void doPost(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest req, HttpServletResponse res)
             throws ServletException, IOException {
-        processRequest(request, response);
+        processRequest(req, res);
     }
 
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
-
         String url = getUrl(request);
-
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
-        out.println("<html><body>");
-        out.println("<p>" + url + "</p>");
-        for (String ctrl : listControllers) {
-            out.println("<li>" + ctrl + "</li>");
+
+        if (urlMappings.containsKey(url)) {
+            Mapping mapping = urlMappings.get(url);
+            out.println("<html><body>");
+            out.println("<p>" + url + " -> " + mapping.toString() + "</p>");
+            out.println("</body></html>");
+        } else {
+            out.println("<html><body>");
+            out.println("<h3>Erreur : URL non enregistrée : " + url + "</h3>");
+            out.println("<p>URLs disponibles :</p><ul>");
+            for (String u : urlMappings.keySet()) {
+                out.println("<li>" + u + "</li>");
+            }
+            out.println("</ul></body></html>");
         }
-        out.println("</body></html>");
     }
 
     protected String getUrl(HttpServletRequest request) {
-        String url = request.getRequestURI().substring(request.getContextPath().length());
-        return url;
+        return request.getRequestURI().substring(request.getContextPath().length());
     }
 }
