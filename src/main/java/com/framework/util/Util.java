@@ -14,12 +14,12 @@ public class Util {
         List<Class<?>> classes = new ArrayList<>();
         String path = packageName.replace('.', '/');
         File dir = new File(Thread.currentThread()
-                    .getContextClassLoader()
-                    .getResource(path).toURI());
+                .getContextClassLoader()
+                .getResource(path).toURI());
         for (File file : dir.listFiles()) {
             if (file.getName().endsWith(".class")) {
                 String className = packageName + "."
-                    + file.getName().replace(".class", "");
+                        + file.getName().replace(".class", "");
                 classes.add(Class.forName(className));
             }
         }
@@ -41,6 +41,7 @@ public class Util {
         return controllers;
     }
 
+
     public static HashMap<String, Mapping> getMappings(String packageName) throws Exception {
         HashMap<String, Mapping> urlMappings = new HashMap<>();
         for (Class<?> clazz : getAllClasses(packageName)) {
@@ -48,6 +49,14 @@ public class Util {
                 for (Method method : clazz.getMethods()) {
                     if (method.isAnnotationPresent(UrlMapping.class)) {
                         String url = method.getAnnotation(UrlMapping.class).value();
+
+                        // Vérification unicité
+                        if (urlMappings.containsKey(url)) {
+                            Mapping existant = urlMappings.get(url);
+                            throw new Exception("URL dupliquée : '" + url + "' déjà enregistrée par "
+                                    + existant.getClassName() + "." + existant.getMethodName());
+                        }
+
                         urlMappings.put(url, new Mapping(clazz.getName(), method.getName()));
                     }
                 }
