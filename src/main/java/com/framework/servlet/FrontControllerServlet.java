@@ -6,6 +6,7 @@ import com.framework.util.UrlMethod;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -46,9 +47,23 @@ public class FrontControllerServlet extends HttpServlet {
 
         if (urlMappings.containsKey(urlMethod)) {
             Mapping mapping = urlMappings.get(urlMethod);
-            out.println("<html><body>");
-            out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
-            out.println("</body></html>");
+
+            try {
+                Class<?> clazz = Class.forName(mapping.getClassName());
+                Object instance = clazz.getDeclaredConstructor().newInstance();
+                Method method = clazz.getMethod(mapping.getMethodName());
+                method.invoke(instance);
+
+                out.println("<html><body>");
+                out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
+                out.println("</body></html>");
+
+            } catch (Exception e) {
+                System.err.println("Erreur lors de l'invocation de " + mapping.toString() + " : " + e.getMessage());
+                e.printStackTrace();
+                out.println("<html><body><h3>Erreur lors de l'invocation</h3></body></html>");
+            }
+
         } else {
             out.println("<html><body>");
             out.println("<h3>Erreur : URL non enregistrée : " + url + " [" + httpMethod + "]</h3>");
