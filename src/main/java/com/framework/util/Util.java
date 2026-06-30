@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Util {
 
@@ -41,30 +42,40 @@ public class Util {
         return controllers;
     }
 
-    public static HashMap<UrlMethod, Mapping> getMappings(String packageName) throws Exception {
-        HashMap<UrlMethod, Mapping> urlMappings = new HashMap<>();
+    public static Map<UrlMethod, Mapping> getMappings(String packageName) throws Exception {
+        Map<UrlMethod, Mapping> urlMappings = new HashMap<>();
+
         for (Class<?> clazz : getAllClasses(packageName)) {
-            if (hasAnnotation(clazz, Controller.class)) {
-                for (Method method : clazz.getMethods()) {
-                    if (method.isAnnotationPresent(UrlMapping.class)) {
-                        
-                        String url = method.getAnnotation(UrlMapping.class).value();
-                        String httpMethod = method.getAnnotation(UrlMapping.class).method();
-                        UrlMethod urlMethod = new UrlMethod(url, httpMethod);
+            if (!hasAnnotation(clazz, Controller.class)) {
+                continue;
+            }
 
-                        // Vérification unicité
-                        if (urlMappings.containsKey(urlMethod)) {
-                            Mapping existant = urlMappings.get(urlMethod);
-                            throw new Exception("URL dupliquée : '" + url 
-                                + "' [" + httpMethod + "] déjà enregistrée par "
-                                + existant.getClassName() + "." + existant.getMethodName());
-                        }
-
-                        urlMappings.put(urlMethod, new Mapping(clazz.getName(), method.getName()));
-                    }
+            for (Method method : clazz.getMethods()) {
+                if (!method.isAnnotationPresent(UrlMapping.class)) {
+                    continue;
                 }
+
+                UrlMapping annotation = method.getAnnotation(UrlMapping.class);
+
+                UrlMethod urlMethod = new UrlMethod();
+                urlMethod.setUrl(annotation.value());
+                urlMethod.setMethod(annotation.method());
+
+                if (urlMappings.containsKey(urlMethod)) {
+                    Mapping existant = urlMappings.get(urlMethod);
+                    throw new Exception("URL dupliquée : '" + annotation.value()
+                        + "' [" + annotation.method() + "] déjà enregistrée par "
+                        + existant.getClassName() + "." + existant.getMethodName());
+                }
+
+                Mapping mapping = new Mapping();
+                mapping.setClassName(clazz.getName());
+                mapping.setMethodName(method.getName());
+
+                urlMappings.put(urlMethod, mapping);
             }
         }
+
         return urlMappings;
     }
 }
