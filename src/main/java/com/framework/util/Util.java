@@ -7,6 +7,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Util {
 
@@ -14,12 +15,12 @@ public class Util {
         List<Class<?>> classes = new ArrayList<>();
         String path = packageName.replace('.', '/');
         File dir = new File(Thread.currentThread()
-                .getContextClassLoader()
-                .getResource(path).toURI());
+                    .getContextClassLoader()
+                    .getResource(path).toURI());
         for (File file : dir.listFiles()) {
             if (file.getName().endsWith(".class")) {
                 String className = packageName + "."
-                        + file.getName().replace(".class", "");
+                    + file.getName().replace(".class", "");
                 classes.add(Class.forName(className));
             }
         }
@@ -41,27 +42,40 @@ public class Util {
         return controllers;
     }
 
+    public static Map<UrlMethod, Mapping> getMappings(String packageName) throws Exception {
+        Map<UrlMethod, Mapping> urlMappings = new HashMap<>();
 
-    public static HashMap<String, Mapping> getMappings(String packageName) throws Exception {
-        HashMap<String, Mapping> urlMappings = new HashMap<>();
         for (Class<?> clazz : getAllClasses(packageName)) {
-            if (hasAnnotation(clazz, Controller.class)) {
-                for (Method method : clazz.getMethods()) {
-                    if (method.isAnnotationPresent(UrlMapping.class)) {
-                        String url = method.getAnnotation(UrlMapping.class).value();
+            if (!hasAnnotation(clazz, Controller.class)) {
+                continue;
+            }
 
-                        // Vérification unicité
-                        if (urlMappings.containsKey(url)) {
-                            Mapping existant = urlMappings.get(url);
-                            throw new Exception("URL dupliquée : '" + url + "' déjà enregistrée par "
-                                    + existant.getClassName() + "." + existant.getMethodName());
-                        }
-
-                        urlMappings.put(url, new Mapping(clazz.getName(), method.getName()));
-                    }
+            for (Method method : clazz.getMethods()) {
+                if (!method.isAnnotationPresent(UrlMapping.class)) {
+                    continue;
                 }
+
+                UrlMapping annotation = method.getAnnotation(UrlMapping.class);
+
+                UrlMethod urlMethod = new UrlMethod();
+                urlMethod.setUrl(annotation.value());
+                urlMethod.setMethod(annotation.method());
+
+                if (urlMappings.containsKey(urlMethod)) {
+                    Mapping existant = urlMappings.get(urlMethod);
+                    throw new Exception("URL dupliquée : '" + annotation.value()
+                        + "' [" + annotation.method() + "] déjà enregistrée par "
+                        + existant.getClassName() + "." + existant.getMethodName());
+                }
+
+                Mapping mapping = new Mapping();
+                mapping.setClassName(clazz.getName());
+                mapping.setMethodName(method.getName());
+
+                urlMappings.put(urlMethod, mapping);
             }
         }
+
         return urlMappings;
     }
 }

@@ -2,15 +2,16 @@ package com.framework.servlet;
 
 import com.framework.util.Mapping;
 import com.framework.util.Util;
+import com.framework.util.UrlMethod;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
 import java.util.HashMap;
+import java.util.Map;
 
 public class FrontControllerServlet extends HttpServlet {
 
-    private static final long serialVersionUID = 1L;
-    private HashMap<String, Mapping> urlMappings = new HashMap<>();
+    private Map<UrlMethod, Mapping> urlMappings = new HashMap<>();
 
     @Override
     public void init() throws ServletException {
@@ -37,20 +38,23 @@ public class FrontControllerServlet extends HttpServlet {
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         String url = getUrl(request);
+        String httpMethod = request.getMethod();
+        UrlMethod urlMethod = new UrlMethod(url, httpMethod);
+
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
 
-        if (urlMappings.containsKey(url)) {
-            Mapping mapping = urlMappings.get(url);
+        if (urlMappings.containsKey(urlMethod)) {
+            Mapping mapping = urlMappings.get(urlMethod);
             out.println("<html><body>");
-            out.println("<p>" + url + " -> " + mapping.toString() + "</p>");
+            out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
             out.println("</body></html>");
         } else {
             out.println("<html><body>");
-            out.println("<h3>Erreur : URL non enregistrée : " + url + "</h3>");
+            out.println("<h3>Erreur : URL non enregistrée : " + url + " [" + httpMethod + "]</h3>");
             out.println("<p>URLs disponibles :</p><ul>");
-            for (String u : urlMappings.keySet()) {
-                out.println("<li>" + u + "</li>");
+            for (UrlMethod u : urlMappings.keySet()) {
+                out.println("<li>" + u.toString() + "</li>");
             }
             out.println("</ul></body></html>");
         }
