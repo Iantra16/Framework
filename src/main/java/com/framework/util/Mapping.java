@@ -1,24 +1,26 @@
 package com.framework.util;
 
+import java.lang.reflect.Method;
+
 public class Mapping {
-    private String className;
-    private String methodName;
+    private Class<?> classe;
+    private Method methode;
 
     public Mapping() {}
 
-    public Mapping(String className, String methodName) {
-        this.className = className;
-        this.methodName = methodName;
+    public Mapping(Class<?> classe, Method methode) {
+        this.classe = classe;
+        this.methode = methode;
     }
 
-    public String getClassName() { return className; }
-    public String getMethodName() { return methodName; }
+    public Class<?> getClasse() { return classe; }
+    public Method getMethode() { return methode; }
 
-    public void setClassName(String className) { this.className = className; }
-    public void setMethodName(String methodName) { this.methodName = methodName; }
+    public void setClasse(Class<?> classe) { this.classe = classe; }
+    public void setMethode(Method methode) { this.methode = methode; }
 
     @Override
     public String toString() {
-        return "classe " + className + " method " + methodName;
+        return "classe " + classe.getName() + " method " + methode.getName();
     }
 }
