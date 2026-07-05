@@ -1,28 +1,13 @@
 package com.framework.servlet;
 
 import com.framework.util.Mapping;
-import com.framework.util.Util;
 import com.framework.util.UrlMethod;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
-import java.lang.reflect.Method;
-import java.util.HashMap;
 import java.util.Map;
 
 public class FrontControllerServlet extends HttpServlet {
-
-    private Map<UrlMethod, Mapping> urlMappings = new HashMap<>();
-
-    @Override
-    public void init() throws ServletException {
-        String packageName = getServletConfig().getInitParameter("package");
-        try {
-            urlMappings = Util.getMappings(packageName);
-        } catch (Exception e) {
-            throw new ServletException("Erreur scan controllers : " + e.getMessage(), e);
-        }
-    }
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
@@ -36,11 +21,16 @@ public class FrontControllerServlet extends HttpServlet {
         processRequest(req, res);
     }
 
+    @SuppressWarnings("unchecked")
     protected void processRequest(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
         String url = getUrl(request);
         String httpMethod = request.getMethod();
         UrlMethod urlMethod = new UrlMethod(url, httpMethod);
+
+        // Récupération de la map depuis le ServletContext (remplie par le Listener au démarrage)
+        Map<UrlMethod, Mapping> urlMappings =
+            (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMappings");
 
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
@@ -49,17 +39,15 @@ public class FrontControllerServlet extends HttpServlet {
             Mapping mapping = urlMappings.get(urlMethod);
 
             try {
-                Class<?> clazz = Class.forName(mapping.getClassName());
-                Object instance = clazz.getDeclaredConstructor().newInstance();
-                Method method = clazz.getMethod(mapping.getMethodName());
-                method.invoke(instance);
+                Object instance = mapping.getClasse().getDeclaredConstructor().newInstance();
+                mapping.getMethode().invoke(instance);
 
                 out.println("<html><body>");
                 out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
                 out.println("</body></html>");
 
             } catch (Exception e) {
-                System.err.println("Erreur lors de l'invocation de " + mapping.toString() + " : " + e.getMessage());
+                System.err.println("Erreur invocation : " + e.getMessage());
                 e.printStackTrace();
                 out.println("<html><body><h3>Erreur lors de l'invocation</h3></body></html>");
             }

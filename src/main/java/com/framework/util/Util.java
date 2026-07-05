@@ -2,6 +2,7 @@ package com.framework.util;
 
 import com.framework.annotation.Controller;
 import com.framework.annotation.UrlMapping;
+import jakarta.servlet.ServletContext;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -42,7 +43,8 @@ public class Util {
         return controllers;
     }
 
-    public static Map<UrlMethod, Mapping> getMappings(String packageName) throws Exception {
+    // Void : on ne retourne plus la Map, on la set directement dans le ServletContext
+    public static void getMappings(String packageName, ServletContext servletContext) throws Exception {
         Map<UrlMethod, Mapping> urlMappings = new HashMap<>();
 
         for (Class<?> clazz : getAllClasses(packageName)) {
@@ -65,17 +67,18 @@ public class Util {
                     Mapping existant = urlMappings.get(urlMethod);
                     throw new Exception("URL dupliquée : '" + annotation.value()
                         + "' [" + annotation.method() + "] déjà enregistrée par "
-                        + existant.getClassName() + "." + existant.getMethodName());
+                        + existant.getClasse().getName() + "." + existant.getMethode().getName());
                 }
 
                 Mapping mapping = new Mapping();
-                mapping.setClassName(clazz.getName());
-                mapping.setMethodName(method.getName());
+                mapping.setClasse(clazz);
+                mapping.setMethode(method);
 
                 urlMappings.put(urlMethod, mapping);
             }
         }
 
-        return urlMappings;
+        // On set dans le ServletContext au lieu de retourner
+        servletContext.setAttribute("urlMappings", urlMappings);
     }
 }
