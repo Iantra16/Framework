@@ -5,7 +5,9 @@ import com.framework.util.UrlMethod;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
+import java.lang.reflect.Method;
 import java.util.Map;
+import com.framework.model.ModelAndView;
 
 public class FrontControllerServlet extends HttpServlet {
 
@@ -28,9 +30,9 @@ public class FrontControllerServlet extends HttpServlet {
         String httpMethod = request.getMethod();
         UrlMethod urlMethod = new UrlMethod(url, httpMethod);
 
-        // Récupération de la map depuis le ServletContext (remplie par le Listener au démarrage)
-        Map<UrlMethod, Mapping> urlMappings =
-            (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMappings");
+        // Récupération de la map depuis le ServletContext (remplie par le Listener au
+        // démarrage)
+        Map<UrlMethod, Mapping> urlMappings = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMappings");
 
         response.setContentType("text/html");
         PrintWriter out = response.getWriter();
@@ -40,7 +42,24 @@ public class FrontControllerServlet extends HttpServlet {
 
             try {
                 Object instance = mapping.getClasse().getDeclaredConstructor().newInstance();
-                mapping.getMethode().invoke(instance);
+                Method method = mapping.getMethode();
+                Object val = method.invoke(instance);
+
+                if (val instanceof ModelAndView) {
+                    ModelAndView mv = (ModelAndView) val;
+
+                    if (mv.getModel() != null) {
+                        for (Map.Entry<String, Object> entry : mv.getModel().entrySet()) {
+                            request.setAttribute(entry.getKey(), entry.getValue());
+                        }
+                    }
+
+                    String prefix = getServletContext().getInitParameter("view-prefix");
+                    String suffix = getServletContext().getInitParameter("view-suffix");
+                    String viewPath = prefix + mv.getViewName() + suffix;
+
+                    request.getRequestDispatcher(viewPath).forward(request, response);
+                }
 
                 out.println("<html><body>");
                 out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
