@@ -2,12 +2,14 @@ package com.framework.servlet;
 
 import com.framework.util.Mapping;
 import com.framework.util.UrlMethod;
+import com.framework.model.ModelAndView;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
-import java.lang.reflect.Method;
 import java.util.Map;
-import com.framework.model.ModelAndView;
+
+import org.springframework.context.ApplicationContext;
+import org.springframework.web.context.support.WebApplicationContextUtils;
 
 public class FrontControllerServlet extends HttpServlet {
 
@@ -30,8 +32,6 @@ public class FrontControllerServlet extends HttpServlet {
         String httpMethod = request.getMethod();
         UrlMethod urlMethod = new UrlMethod(url, httpMethod);
 
-        // Récupération de la map depuis le ServletContext (remplie par le Listener au
-        // démarrage)
         Map<UrlMethod, Mapping> urlMappings = (Map<UrlMethod, Mapping>) getServletContext().getAttribute("urlMappings");
 
         response.setContentType("text/html");
@@ -41,29 +41,36 @@ public class FrontControllerServlet extends HttpServlet {
             Mapping mapping = urlMappings.get(urlMethod);
 
             try {
-                Object instance = mapping.getClasse().getDeclaredConstructor().newInstance();
-                Method method = mapping.getMethode();
-                Object val = method.invoke(instance);
+                ApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(getServletContext());
+                String className = mapping.getClasse().getSimpleName();
+                String beanName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
+                Object instance = ctx.getBean(beanName);
 
-                if (val instanceof ModelAndView) {
-                    ModelAndView mv = (ModelAndView) val;
+                // Récupérer la valeur de retour de la méthode
+                Object result = mapping.getMethode().invoke(instance);
 
-                    if (mv.getModel() != null) {
-                        for (Map.Entry<String, Object> entry : mv.getModel().entrySet()) {
-                            request.setAttribute(entry.getKey(), entry.getValue());
-                        }
+                if (result instanceof ModelAndView) {
+                    ModelAndView mv = (ModelAndView) result;
+
+                    // Mettre les données du modèle dans la request
+                    for (Map.Entry<String, Object> entry : mv.getModel().entrySet()) {
+                        request.setAttribute(entry.getKey(), entry.getValue());
                     }
 
+                    // Construire le chemin de la vue
                     String prefix = getServletContext().getInitParameter("view-prefix");
                     String suffix = getServletContext().getInitParameter("view-suffix");
                     String viewPath = prefix + mv.getViewName() + suffix;
 
+                    // Forward vers la JSP
                     request.getRequestDispatcher(viewPath).forward(request, response);
-                }
 
-                out.println("<html><body>");
-                out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
-                out.println("</body></html>");
+                } else {
+                    // Pas de ModelAndView, affichage simple
+                    out.println("<html><body>");
+                    out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
+                    out.println("</body></html>");
+                }
 
             } catch (Exception e) {
                 System.err.println("Erreur invocation : " + e.getMessage());
