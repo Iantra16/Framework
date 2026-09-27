@@ -2,11 +2,14 @@ package com.framework.servlet;
 
 import com.framework.util.Mapping;
 import com.framework.util.UrlMethod;
+import com.framework.annotation.WebApi;
 import com.framework.model.ModelAndView;
 import jakarta.servlet.*;
 import jakarta.servlet.http.*;
 import java.io.*;
 import java.util.Map;
+import com.google.gson.Gson;
+
 
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
@@ -46,23 +49,26 @@ public class FrontControllerServlet extends HttpServlet {
                 String beanName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
                 Object instance = ctx.getBean(beanName);
 
-                // Récupérer la valeur de retour de la méthode
                 Object result = mapping.getMethode().invoke(instance);
 
-                if (result instanceof ModelAndView) {
+                // Vérifier si la méthode a @WebApi
+                if (mapping.getMethode().isAnnotationPresent(WebApi.class)) {
+                    // Retourner du JSON
+                    response.setContentType("application/json");
+                    Gson gson = new Gson();
+                    out.println(gson.toJson(result));
+
+                } else if (result instanceof ModelAndView) {
                     ModelAndView mv = (ModelAndView) result;
 
-                    // Mettre les données du modèle dans la request
                     for (Map.Entry<String, Object> entry : mv.getModel().entrySet()) {
                         request.setAttribute(entry.getKey(), entry.getValue());
                     }
 
-                    // Construire le chemin de la vue
                     String prefix = getServletContext().getInitParameter("view-prefix");
                     String suffix = getServletContext().getInitParameter("view-suffix");
                     String viewPath = prefix + mv.getViewName() + suffix;
 
-                    // Forward vers la JSP
                     request.getRequestDispatcher(viewPath).forward(request, response);
 
                 } else {
