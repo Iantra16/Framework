@@ -19,7 +19,8 @@ CLASSPATH=$(find "$LIB_DIR" -name "*.jar" | tr '\n' ':')
 find "$SRC_DIR" -name "*.java" > sources.txt
 
 echo "--- $APP_NAME : Démarrage de la compilation ---"
-javac -cp "$CLASSPATH" -d $BUILD_DIR @sources.txt
+# javac -cp "$CLASSPATH" -d $BUILD_DIR @sources.txt
+javac -parameters -cp "$CLASSPATH" -d $BUILD_DIR @sources.txt
 
 if [ $? -eq 0 ]; then
     echo "Succès : Fichiers .class générés."
