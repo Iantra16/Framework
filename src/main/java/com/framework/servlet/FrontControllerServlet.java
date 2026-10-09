@@ -10,6 +10,7 @@ import java.io.*;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
+
 import com.google.gson.Gson;
 
 import org.springframework.context.ApplicationContext;
@@ -62,8 +63,16 @@ public class FrontControllerServlet extends HttpServlet {
 
                     Class<?> paramType = parameters[i].getType();
 
-                    if (paramValue == null) {
-                        arguments[i] = null;
+                    if (paramValue == null && !isSimpleType(paramType)) {
+                        Object obj = paramType.getDeclaredConstructor().newInstance();
+                        for (java.lang.reflect.Field field : paramType.getDeclaredFields()) {
+                            field.setAccessible(true);
+                            String fieldValue = request.getParameter(field.getName());
+                            if (fieldValue != null) {
+                                field.set(obj, fieldValue);
+                            }
+                        }
+                        arguments[i] = obj;
                     } else if (paramType == String.class) {
                         arguments[i] = paramValue;
                     } else if (paramType == int.class || paramType == Integer.class) {
@@ -125,5 +134,13 @@ public class FrontControllerServlet extends HttpServlet {
 
     protected String getUrl(HttpServletRequest request) {
         return request.getRequestURI().substring(request.getContextPath().length());
+    }
+
+    private boolean isSimpleType(Class<?> type) {
+        return type == String.class
+                || type == int.class || type == Integer.class
+                || type == long.class || type == Long.class
+                || type == double.class || type == Double.class
+                || type == boolean.class || type == Boolean.class;
     }
 }
