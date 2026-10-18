@@ -4,10 +4,14 @@ import com.framework.util.Mapping;
 import com.framework.util.UrlMethod;
 import com.framework.annotation.WebApi;
 import com.framework.model.ModelAndView;
+import com.framework.upload.MapFile;
+
 import jakarta.servlet.*;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.*;
 import java.io.*;
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 
@@ -16,6 +20,7 @@ import com.google.gson.Gson;
 import org.springframework.context.ApplicationContext;
 import org.springframework.web.context.support.WebApplicationContextUtils;
 
+@MultipartConfig
 public class FrontControllerServlet extends HttpServlet {
 
     @Override
@@ -63,9 +68,24 @@ public class FrontControllerServlet extends HttpServlet {
 
                     Class<?> paramType = parameters[i].getType();
 
-                    if (paramValue == null && !isSimpleType(paramType)) {
+                    if (Map.class.isAssignableFrom(paramType)) {
+                        Map<String, MapFile> fichiers = new java.util.HashMap<>();
+                        try {
+                            for (Part part : request.getParts()) {
+                                String fileName = part.getSubmittedFileName();
+                                if (fileName != null && !fileName.isEmpty()) {
+                                    byte[] binaire = part.getInputStream().readAllBytes();
+                                    fichiers.put(part.getName(), new MapFile(fileName, binaire));
+                                }
+                            }
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                        }
+                        arguments[i] = fichiers;
+
+                    } else if (paramValue == null && !isSimpleType(paramType)) {
                         Object obj = paramType.getDeclaredConstructor().newInstance();
-                        for (java.lang.reflect.Field field : paramType.getDeclaredFields()) {
+                        for (Field field : paramType.getDeclaredFields()) {
                             field.setAccessible(true);
                             String fieldValue = request.getParameter(field.getName());
                             if (fieldValue != null) {
@@ -121,7 +141,9 @@ public class FrontControllerServlet extends HttpServlet {
                 out.println("<html><body><h3>Erreur lors de l'invocation</h3></body></html>");
             }
 
-        } else {
+        } else
+
+        {
             out.println("<html><body>");
             out.println("<h3>Erreur : URL non enregistrée : " + url + " [" + httpMethod + "]</h3>");
             out.println("<p>URLs disponibles :</p><ul>");
