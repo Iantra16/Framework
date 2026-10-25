@@ -5,6 +5,7 @@ import com.framework.util.UrlMethod;
 import com.framework.annotation.WebApi;
 import com.framework.model.ModelAndView;
 import com.framework.upload.MapFile;
+import com.framework.session.MySession;
 
 import jakarta.servlet.*;
 import jakarta.servlet.annotation.MultipartConfig;
@@ -57,7 +58,6 @@ public class FrontControllerServlet extends HttpServlet {
                 Object instance = ctx.getBean(beanName);
 
                 Method method = mapping.getMethode();
-                // Object result = method.invoke(instance);
 
                 Parameter[] parameters = method.getParameters();
                 Object[] arguments = new Object[parameters.length];
@@ -65,10 +65,21 @@ public class FrontControllerServlet extends HttpServlet {
                 for (int i = 0; i < parameters.length; i++) {
                     String paramName = parameters[i].getName();
                     String paramValue = request.getParameter(paramName);
-
                     Class<?> paramType = parameters[i].getType();
 
-                    if (Map.class.isAssignableFrom(paramType)) {
+                    if (paramType == MySession.class) {
+                        // Créer MySession et la remplir depuis HttpSession
+                        MySession mySession = new MySession();
+                        HttpSession httpSession = request.getSession();
+                        java.util.Enumeration<String> names = httpSession.getAttributeNames();
+                        while (names.hasMoreElements()) {
+                            String name = names.nextElement();
+                            mySession.set(name, httpSession.getAttribute(name));
+                        }
+                        arguments[i] = mySession;
+
+                    } else if (Map.class.isAssignableFrom(paramType)) {
+                        // Fichiers uploadés
                         Map<String, MapFile> fichiers = new java.util.HashMap<>();
                         try {
                             for (Part part : request.getParts()) {
@@ -84,6 +95,7 @@ public class FrontControllerServlet extends HttpServlet {
                         arguments[i] = fichiers;
 
                     } else if (paramValue == null && !isSimpleType(paramType)) {
+                        // Objet complexe (S7 bis)
                         Object obj = paramType.getDeclaredConstructor().newInstance();
                         for (Field field : paramType.getDeclaredFields()) {
                             field.setAccessible(true);
@@ -93,6 +105,7 @@ public class FrontControllerServlet extends HttpServlet {
                             }
                         }
                         arguments[i] = obj;
+
                     } else if (paramType == String.class) {
                         arguments[i] = paramValue;
                     } else if (paramType == int.class || paramType == Integer.class) {
@@ -109,6 +122,17 @@ public class FrontControllerServlet extends HttpServlet {
                 }
 
                 Object result = method.invoke(instance, arguments);
+
+                // Après invoke : mettre à jour HttpSession depuis MySession
+                for (int i = 0; i < parameters.length; i++) {
+                    if (parameters[i].getType() == MySession.class) {
+                        MySession mySession = (MySession) arguments[i];
+                        HttpSession httpSession = request.getSession();
+                        for (Map.Entry<String, Object> entry : mySession.getData().entrySet()) {
+                            httpSession.setAttribute(entry.getKey(), entry.getValue());
+                        }
+                    }
+                }
 
                 if (mapping.getMethode().isAnnotationPresent(WebApi.class)) {
                     response.setContentType("application/json");
@@ -129,7 +153,6 @@ public class FrontControllerServlet extends HttpServlet {
                     request.getRequestDispatcher(viewPath).forward(request, response);
 
                 } else {
-                    // Pas de ModelAndView, affichage simple
                     out.println("<html><body>");
                     out.println("<p>" + url + " [" + httpMethod + "] -> " + mapping.toString() + "</p>");
                     out.println("</body></html>");
@@ -141,9 +164,7 @@ public class FrontControllerServlet extends HttpServlet {
                 out.println("<html><body><h3>Erreur lors de l'invocation</h3></body></html>");
             }
 
-        } else
-
-        {
+        } else {
             out.println("<html><body>");
             out.println("<h3>Erreur : URL non enregistrée : " + url + " [" + httpMethod + "]</h3>");
             out.println("<p>URLs disponibles :</p><ul>");
