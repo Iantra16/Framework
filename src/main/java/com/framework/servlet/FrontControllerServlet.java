@@ -2,6 +2,7 @@ package com.framework.servlet;
 
 import com.framework.util.Mapping;
 import com.framework.util.UrlMethod;
+import com.framework.annotation.Auth;
 import com.framework.annotation.WebApi;
 import com.framework.model.ModelAndView;
 import com.framework.upload.MapFile;
@@ -123,6 +124,17 @@ public class FrontControllerServlet extends HttpServlet {
                     }
                 }
 
+                // verif authentification
+                if (mapping.getMethode().isAnnotationPresent(Auth.class)) {
+                    String authVar = (String) getServletContext().getAttribute("authVar");
+                    String redirectVar = (String) getServletContext().getAttribute("redirectVar");
+                    HttpSession session = request.getSession(false);
+                    if (session == null || session.getAttribute(authVar) == null) {
+                        response.sendRedirect(request.getContextPath() + redirectVar);
+                        return;
+                    }
+                }
+                
                 Object result = method.invoke(instance, arguments);
 
                 // Après invoke : mettre à jour HttpSession depuis MySession

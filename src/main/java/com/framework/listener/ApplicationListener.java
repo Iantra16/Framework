@@ -14,8 +14,13 @@ public class ApplicationListener implements ServletContextListener {
         ServletContext servletContext = sce.getServletContext();
         String packageName = servletContext.getInitParameter("package");
 
+        String authVar = servletContext.getInitParameter("auth-variable");
+        String redirectVar = servletContext.getInitParameter("auth-redirect");
+        servletContext.setAttribute("authVar", authVar);
+        servletContext.setAttribute("redirectVar", redirectVar);
         try {
             Util.getMappings(packageName, servletContext);
+
             servletContext.log("ApplicationListener : scan terminé pour le package " + packageName);
         } catch (Exception e) {
             servletContext.log("ApplicationListener : erreur lors du scan : " + e.getMessage());
