@@ -3,6 +3,7 @@ package com.framework.servlet;
 import com.framework.util.Mapping;
 import com.framework.util.UrlMethod;
 import com.framework.annotation.Auth;
+import com.framework.annotation.Role;
 import com.framework.annotation.WebApi;
 import com.framework.model.ModelAndView;
 import com.framework.upload.MapFile;
@@ -17,7 +18,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Parameter;
 import java.util.Map;
 import java.util.Collections;
-import java.util.Enumeration;
 
 import com.google.gson.Gson;
 
@@ -53,14 +53,43 @@ public class FrontControllerServlet extends HttpServlet {
 
         if (urlMappings.containsKey(urlMethod)) {
             Mapping mapping = urlMappings.get(urlMethod);
+            Method method = mapping.getMethode();
+
+            // ---- Autorisation : toujours avant tout traitement ----
+            // @Role implique d'être authentifié, même sans @Auth
+            if (method.isAnnotationPresent(Auth.class) || method.isAnnotationPresent(Role.class)) {
+                String authVar = (String) getServletContext().getAttribute("authVar");
+                HttpSession httpSession = request.getSession(false);
+
+                // Pas connecté -> 401
+                if (httpSession == null || httpSession.getAttribute(authVar) == null) {
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Vous devez être connecté");
+                    return;
+                }
+
+                // Connecté mais rôle non autorisé -> 403
+                if (method.isAnnotationPresent(Role.class)) {
+                    String roleVar = (String) getServletContext().getAttribute("roleVar");
+                    String userRole = (String) httpSession.getAttribute(roleVar);
+                    boolean autorise = false;
+                    for (String role : method.getAnnotation(Role.class).value()) {
+                        if (role.equals(userRole)) {
+                            autorise = true;
+                            break;
+                        }
+                    }
+                    if (!autorise) {
+                        response.sendError(HttpServletResponse.SC_FORBIDDEN, "Accès refusé : rôle insuffisant");
+                        return;
+                    }
+                }
+            }
 
             try {
                 ApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(getServletContext());
                 String className = mapping.getClasse().getSimpleName();
                 String beanName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
                 Object instance = ctx.getBean(beanName);
-
-                Method method = mapping.getMethode();
 
                 Parameter[] parameters = method.getParameters();
                 Object[] arguments = new Object[parameters.length];
@@ -74,11 +103,12 @@ public class FrontControllerServlet extends HttpServlet {
                         // Créer MySession et la remplir depuis HttpSession
                         MySession mySession = new MySession();
                         HttpSession httpSession = request.getSession();
-                        System.out.println("[MySession] Chargée depuis HttpSession - isDirty = " + mySession.isDirty());
                         for (String name : Collections.list(httpSession.getAttributeNames())) {
                             mySession.set(name, httpSession.getAttribute(name));
                         }
+                        // Le chargement initial ne compte pas comme une modification
                         mySession.resetDirty();
+                        System.out.println("[MySession] Chargée depuis HttpSession - isDirty = " + mySession.isDirty());
                         arguments[i] = mySession;
 
                     } else if (Map.class.isAssignableFrom(paramType)) {
@@ -124,26 +154,23 @@ public class FrontControllerServlet extends HttpServlet {
                     }
                 }
 
-                // verif authentification
-                if (mapping.getMethode().isAnnotationPresent(Auth.class)) {
-                    String authVar = (String) getServletContext().getAttribute("authVar");
-                    String redirectVar = (String) getServletContext().getAttribute("redirectVar");
-                    HttpSession session = request.getSession(false);
-                    if (session == null || session.getAttribute(authVar) == null) {
-                        response.sendRedirect(request.getContextPath() + redirectVar);
-                        return;
-                    }
-                }
-                
                 Object result = method.invoke(instance, arguments);
 
-                // Après invoke : mettre à jour HttpSession depuis MySession
+                // Après invoke : mettre à jour HttpSession depuis MySession, seulement si modifiée
                 for (int i = 0; i < parameters.length; i++) {
                     if (parameters[i].getType() == MySession.class) {
                         MySession mySession = (MySession) arguments[i];
-                        HttpSession httpSession = request.getSession();
                         if (mySession.isDirty()) {
                             System.out.println("[MySession] Mise à jour HttpSession...");
+                            HttpSession httpSession = request.getSession();
+
+                            // Supprimer de HttpSession les variables retirées via session.remove()
+                            for (String name : Collections.list(httpSession.getAttributeNames())) {
+                                if (!mySession.getData().containsKey(name)) {
+                                    httpSession.removeAttribute(name);
+                                }
+                            }
+                            // Ajouter / mettre à jour les autres
                             for (Map.Entry<String, Object> entry : mySession.getData().entrySet()) {
                                 httpSession.setAttribute(entry.getKey(), entry.getValue());
                             }
@@ -153,7 +180,7 @@ public class FrontControllerServlet extends HttpServlet {
                     }
                 }
 
-                if (mapping.getMethode().isAnnotationPresent(WebApi.class)) {
+                if (method.isAnnotationPresent(WebApi.class)) {
                     response.setContentType("application/json");
                     Gson gson = new Gson();
                     out.println(gson.toJson(result));
