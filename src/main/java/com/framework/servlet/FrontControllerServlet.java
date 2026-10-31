@@ -21,9 +21,6 @@ import java.util.Collections;
 
 import com.google.gson.Gson;
 
-import org.springframework.context.ApplicationContext;
-import org.springframework.web.context.support.WebApplicationContextUtils;
-
 @MultipartConfig
 public class FrontControllerServlet extends HttpServlet {
 
@@ -86,10 +83,12 @@ public class FrontControllerServlet extends HttpServlet {
             }
 
             try {
-                ApplicationContext ctx = WebApplicationContextUtils.getWebApplicationContext(getServletContext());
+                // Instance unique du controller, créée au démarrage par ApplicationListener
+                Map<String, Object> controllerInstances =
+                        (Map<String, Object>) getServletContext().getAttribute("controllerInstances");
                 String className = mapping.getClasse().getSimpleName();
                 String beanName = Character.toLowerCase(className.charAt(0)) + className.substring(1);
-                Object instance = ctx.getBean(beanName);
+                Object instance = controllerInstances.get(beanName);
 
                 Parameter[] parameters = method.getParameters();
                 Object[] arguments = new Object[parameters.length];
